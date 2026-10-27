@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nợ Có Ơi Prototype</title>
+<style>
+:root {
+  --bg: #e8e2d2;
+  --paper: #fbf8ef;
+  --paper-line: #e6dfcc;
+  --margin: #e4a49a;
+  --ink: #1f2a2e;
+  --muted: #66746f;
+  --teal: #1f6f6a;
+  --teal-soft: #d8ece9;
+  --gold: #e9a93b;
+  --gold-ink: #4a3410;
+  --debit: #2f6db5;
+  --debit-soft: #e3edf9;
+  --credit: #c0392b;
+  --credit-soft: #fbe6e3;
+  --good: #2e8b57;
+  --bad: #c0392b;
+  --line: #d6cdb6;
+  --shadow: 0 1px 0 rgba(0, 0, 0, .04), 0 6px 18px rgba(60, 45, 20, .10);
+  --radius: 12px;
+  --fast: 150ms;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121719; --paper: #1d2427; --paper-line: #273035; --margin: #7a4b45;
+    --ink: #e7ecea; --muted: #9aa8a4; --teal: #45b3a9; --teal-soft: #1c3533;
+    --gold: #e3b04f; --gold-ink: #1b1406; --debit: #6aa4ea; --debit-soft: #1b2a3c;
+    --credit: #ef7564; --credit-soft: #3a2220; --good: #5cc98b; --bad: #ef7564; --line: #36423f;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121719; --paper: #1d2427; --paper-line: #273035; --margin: #7a4b45;
+  --ink: #e7ecea; --muted: #9aa8a4; --teal: #45b3a9; --teal-soft: #1c3533;
+  --gold: #e3b04f; --gold-ink: #1b1406; --debit: #6aa4ea; --debit-soft: #1b2a3c;
+  --credit: #ef7564; --credit-soft: #3a2220; --good: #5cc98b; --bad: #ef7564; --line: #36423f;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+
+.app {
+  max-width: 520px; min-height: 100vh; margin: 0 auto; background: var(--paper);
+  background-image: repeating-linear-gradient(transparent 0 27px, var(--paper-line) 27px 28px);
+  border-left: 2px solid var(--margin); box-shadow: var(--shadow); display: flex; flex-direction: column;
+}
+
+.hud {
+  position: sticky; top: 0; z-index: 5; display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 16px; background: var(--paper); border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: baseline; gap: 8px; }
+.brand small { color: var(--muted); }
+.logo { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--teal); color: #fff; font-weight: 700; align-self: center; }
+.hud-right { display: flex; gap: 8px; align-items: center; }
+.pill { padding: 3px 10px; border-radius: 999px; background: var(--teal-soft); color: var(--teal); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+main { flex: 1; padding: 12px 16px 120px; }
+
+.primary, .ghost, .chip, .side-add, .amt {
+  border-radius: var(--radius); border: 1.5px solid var(--line); background: var(--paper);
+  transition: transform var(--fast), border-color var(--fast), background var(--fast);
+}
+.primary { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); font-weight: 700; padding: 12px 18px; box-shadow: 0 3px 0 rgba(0, 0, 0, .15); }
+.primary:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+.primary.go { background: var(--teal); border-color: var(--teal); color: #fff; }
+.ghost { padding: 6px 12px; }
+.ghost:hover, .chip:hover, .amt:hover { border-color: var(--teal); }
+
+/* intro */
+.intro { text-align: center; padding-top: 40px; }
+.intro h1 { font-size: 30px; margin: 8px 0 4px; color: var(--teal); }
+.intro p { color: var(--muted); max-width: 380px; margin: 8px auto; }
+.intro .rules { text-align: left; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; margin: 18px auto; max-width: 400px; }
+.intro .rules li { margin: 4px 0; }
+.mascot { font-size: 56px; }
+
+/* clock */
+.clock { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.clock b { font-variant-numeric: tabular-nums; min-width: 78px; }
+.track { flex: 1; height: 8px; border-radius: 99px; background: var(--paper-line); overflow: hidden; }
+.track > i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), var(--credit)); transform-origin: left; }
+
+/* queue */
+.queue { display: flex; gap: 8px; min-height: 88px; overflow-x: auto; padding-bottom: 4px; }
+.carrier {
+  position: relative; width: 74px; flex: none; padding: 8px 4px 6px; border-radius: var(--radius);
+  border: 1.5px solid var(--line); background: var(--paper); text-align: center; font-size: 12px;
+}
+.carrier.on { border-color: var(--teal); background: var(--teal-soft); }
+.carrier .face { display: grid; place-items: center; width: 36px; height: 36px; margin: 0 auto 4px; border-radius: 50%; background: var(--gold); color: var(--gold-ink); font-weight: 700; }
+.carrier .tag { position: absolute; top: 4px; right: 4px; font-size: 10px; font-weight: 700; color: var(--muted); }
+.carrier .pat { height: 5px; border-radius: 9px; background: var(--paper-line); margin-top: 4px; overflow: hidden; }
+.carrier .pat > i { display: block; height: 100%; background: var(--good); }
+.carrier .pat.low > i { background: var(--bad); }
+.queue-empty { color: var(--muted); align-self: center; font-size: 13px; }
+
+/* steps */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0 8px; }
+.steps span { text-align: center; font-size: 12px; font-weight: 700; padding: 4px; border-radius: 8px; background: var(--paper-line); color: var(--muted); }
+.steps span.now { background: var(--teal); color: #fff; }
+
+/* paper document */
+.paper { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); padding: 10px 12px; }
+.paper h3 { margin: 2px 0; text-align: center; color: var(--credit); letter-spacing: .5px; font-size: 16px; }
+.paper .sub { text-align: center; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+.pf {
+  display: flex; justify-content: space-between; gap: 12px; width: 100%; text-align: left; padding: 5px 6px;
+  border: 0; border-bottom: 1px dashed var(--paper-line); background: none; border-radius: 4px;
+}
+.pf span { color: var(--muted); }
+.pf b { text-align: right; font-variant-numeric: tabular-nums; }
+.pf small { display: block; font-weight: 400; color: var(--muted); }
+.checking .pf:hover { background: var(--teal-soft); }
+.pf.miss { background: var(--credit-soft); animation: shake 250ms; }
+.pf.hit { background: #fff1c2; }
+.pf.total b { color: var(--credit); font-size: 16px; }
+.items { width: 100%; border-collapse: collapse; font-size: 13px; }
+.items th { color: var(--muted); font-weight: 600; text-align: left; }
+.items td, .items th { padding: 3px 2px; }
+.items .r { text-align: right; font-variant-numeric: tabular-nums; }
+@keyframes shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
+/* Cô Ba bubble */
+.bubble { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0; }
+.bubble .ava { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #d9c8e8; color: #4b2a63; font-weight: 700; font-size: 12px; }
+.bubble p { margin: 0; padding: 8px 12px; border-radius: 4px 12px 12px 12px; background: var(--teal-soft); border: 1px solid var(--line); }
+.bubble.good p { background: color-mix(in srgb, var(--good) 14%, var(--paper)); }
+.bubble.bad p { background: var(--credit-soft); }
+
+/* entry builder */
+.summary-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; }
+.summary-strip div { background: var(--paper-line); border-radius: 8px; padding: 6px 8px; font-size: 12px; color: var(--muted); }
+.summary-strip b { display: block; color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; }
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.side { border-radius: var(--radius); padding: 8px; min-height: 120px; }
+.side.n { background: var(--debit-soft); border: 1.5px solid var(--debit); }
+.side.c { background: var(--credit-soft); border: 1.5px solid var(--credit); }
+.side header { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 6px; }
+.side.n header { color: var(--debit); }
+.side.c header { color: var(--credit); }
+.eline { background: var(--paper); border-radius: 8px; padding: 6px 8px; margin-bottom: 6px; font-size: 13px; }
+.eline .top { display: flex; justify-content: space-between; gap: 4px; }
+.eline .x { border: 0; background: none; color: var(--muted); padding: 0 4px; }
+.amts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.amt { padding: 2px 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.amt.sel { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); font-weight: 700; }
+.side-add { width: 100%; padding: 6px; border-style: dashed; font-size: 13px; background: transparent; }
+.status { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 6px; font-size: 13px; color: var(--muted); }
+.badge { padding: 2px 10px; border-radius: 99px; font-weight: 700; font-size: 12px; }
+.badge.ok { background: color-mix(in srgb, var(--good) 18%, var(--paper)); color: var(--good); }
+.badge.no { background: var(--credit-soft); color: var(--credit); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+.chip { padding: 6px 8px; text-align: left; font-size: 13px; }
+.chip small { display: block; color: var(--muted); }
+.chip.sel { border-color: var(--teal); background: var(--teal-soft); box-shadow: inset 0 0 0 1px var(--teal); }
+
+/* action bar */
+.actions {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: min(520px, 100%);
+  display: flex; gap: 8px; padding: 10px 16px 14px; background: var(--paper); border-top: 1px solid var(--line); z-index: 6;
+}
+.actions .primary { flex: 1; }
+
+/* toasts */
+.float { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); font-weight: 800; font-size: 22px; pointer-events: none; animation: rise 900ms forwards; z-index: 9; }
+.float.plus { color: var(--good); }
+.float.minus { color: var(--bad); }
+@keyframes rise { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -30px); } }
+
+/* summary */
+.report h2 { color: var(--teal); margin: 8px 0; }
+.stars { font-size: 26px; color: var(--gold); letter-spacing: 2px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.stats div { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; text-align: center; }
+.stats b { display: block; font-size: 22px; }
+.stats small { color: var(--muted); }
+.wallet, .reveal { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; margin: 10px 0; }
+.wallet div { display: flex; justify-content: space-between; padding: 2px 0; }
+.wallet .sum { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 6px; font-weight: 700; }
+.reveal h3 { margin: 0 0 6px; color: var(--credit); font-size: 15px; }
+.reveal .err { border-top: 1px dashed var(--line); padding: 6px 0; font-size: 13px; }
+.reveal .err code { font-family: ui-monospace, Consolas, monospace; }
+
+dialog { border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); color: var(--ink); max-width: 460px; width: calc(100% - 32px); }
+dialog::backdrop { background: rgba(0, 0, 0, .35); }
+dialog h2 { margin-top: 0; color: var(--teal); }
+dialog h4 { margin: 12px 0 4px; }
+dialog ul { margin: 0; padding-left: 18px; }
+
+.paused-veil { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); display: grid; place-items: center; z-index: 8; }
+.paused-veil div { background: var(--paper); padding: 20px 24px; border-radius: var(--radius); text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hud">
+    <div class="brand"><span class="logo" aria-hidden="true">₫</span><b>Nợ Có Ơi</b><small>prototype · 1 ca</small></div>
+    <div class="hud-right">
+      <span class="pill" id="score" title="Điểm ca">0 đ</span>
+      <button class="ghost" id="btn-notes" type="button">Sổ tay</button>
+    </div>
+  </header>
+
+  <main id="screen"></main>
+
+  <dialog id="notes">
+    <form method="dialog">
+      <h2>Sổ tay</h2>
+      <div id="notes-body"></div>
+      <button class="primary" type="submit">Đóng</button>
+    </form>
+  </dialog>
+</div>
+<script>
+/*
+ * Nợ Có Ơi prototype: pure game rules (no DOM).
+ * Mirrors the behaviour documented in game-ke-toan/game-ke-toan-analysis.md.
+ * Works in the browser (window.NC) and in Node (module.exports) for tests.
+ */
+(function (root) {
+  'use strict';
+
+  const CFG = Object.freeze({
+    shiftSec: 180,          // one shift = one working week, in real seconds
+    patBase: 75,            // carrier patience in seconds (original: 300 s, shortened for a one-shift demo)
+    returnSec: 10,          // corrected copy comes back after this delay
+    docsPerShift: 7,
+    defectChance: 0.3,      // original: min(0.38, 0.18 + 0.012 * level)
+    fastSec: 20,
+    pts: Object.freeze({ ok: 100, fast: 20, catch: 40, wrongTap: -10, left: -50 }),
+    vatGoods: 8,
+    bonusPerPoint: 100,     // weekly bonus = score × 100 đ
+    salary: 600000
+  });
+
+  const COMPANY = Object.freeze({ name: 'Công ty TNHH Vật Tư Phát Tài', mst: '0318 456 789', series: '1C26TPT' });
+
+  const ACCOUNTS = Object.freeze({
+    '111': 'Tiền mặt', '112': 'Ngân hàng', '133': 'GTGT đầu vào', '156': 'Hàng hoá',
+    '331': 'Phải trả người bán', '3331': 'GTGT đầu ra', '511': 'Doanh thu', '642': 'Chi phí quản lý'
+  });
+
+  const CUSTOMERS = Object.freeze([
+    { name: 'Cửa hàng sơn Bảy Màu', mst: '0312 778 901' },
+    { name: 'Cửa hàng Kim Ngân', mst: '0313 990 112' },
+    { name: 'Công ty Xây dựng Thuận Phát', mst: '0314 556 677' },
+    { name: 'Anh Lâm (đội thợ sơn)', mst: '—' }
+  ]);
+  const SUPPLIER = Object.freeze({ name: 'Công ty Sơn Đại Dương', mst: '0301 234 567', series: '1C26TDD' });
+  const ITEMS = Object.freeze([
+    { name: 'Sơn nước nội thất 18L', unit: 'Thùng', price: 500000, cost: 360000 },
+    { name: 'Sơn chống thấm 20kg', unit: 'Thùng', price: 1150000, cost: 820000 },
+    { name: 'Băng keo giấy 48mm', unit: 'Thùng', price: 720000, cost: 510000 },
+    { name: 'Bột trét tường 40kg', unit: 'Bao', price: 300000, cost: 210000 }
+  ]);
+  const EXPENSES = Object.freeze([
+    { who: 'Bãi xe Tân Phong', why: 'Phí gửi xe nhân viên tháng', amt: 520000 },
+    { who: 'Cửa hàng nước Hồng Phúc', why: 'Mua nước uống văn phòng', amt: 430000 },
+    { who: 'Anh Tuấn (thợ sửa)', why: 'Sửa máy in văn phòng', amt: 450000 },
+    { who: 'Nhà sách Tiến Thọ', why: 'Mua văn phòng phẩm', amt: 386000 }
+  ]);
+  const SIGS_PC = Object.freeze(['Giám đốc', 'Kế toán', 'Thủ quỹ', 'Người nhận']);
+
+  // Which defects can appear on each document type, and which line the player must tap.
+  const DEFECTS = Object.freeze({
+    sum: { field: 'line', msg: 'Thành tiền không bằng số lượng × đơn giá.' },
+    tot: { field: 'tot', msg: 'Tổng thanh toán không bằng tiền hàng cộng tiền thuế.' },
+    rate: { field: 'rate', msg: 'Hàng hoá năm 2026 chịu thuế GTGT 8%.' },
+    buyer: { field: 'mstm', msg: 'Hoá đơn mua vào: MST người mua phải là MST công ty mình.' },
+    dup: { field: 'no', msg: 'Hoá đơn này đã ghi sổ rồi (trùng ký hiệu và số).' },
+    sig: { field: 'sig', msg: 'Phiếu chưa có đủ chữ ký. Thiếu chữ ký thì chưa đủ căn cứ ghi sổ.' }
+  });
+  const DEFECTS_BY_TYPE = Object.freeze({
+    banCK: ['sum', 'tot', 'rate'], banTM: ['sum', 'tot', 'rate'],
+    muaNo: ['sum', 'tot', 'buyer', 'dup'], chiTM: ['sig'], nop: []
+  });
+
+  const TYPES = Object.freeze({
+    banCK: { carrier: 'Bé Mít', tag: 'HĐ', hint: 'Bán hàng, tiền về ngân hàng: Nợ 112 tổng tiền; Có 511 tiền hàng, Có 3331 tiền thuế.' },
+    banTM: { carrier: 'Bé Mít', tag: 'HĐ', hint: 'Bán thu tiền mặt: Nợ 111 tổng tiền; Có 511 tiền hàng, Có 3331 tiền thuế.' },
+    muaNo: { carrier: 'Chú Ba Đại Dương', tag: 'HĐ', hint: 'Mua hàng chưa trả: Nợ 156 tiền hàng, Nợ 133 tiền thuế; Có 331 tổng tiền.' },
+    chiTM: { carrier: 'Chị Thu Quỹ', tag: 'PC', hint: 'Chi tiền mặt cho chi phí: Nợ 642, Có 111.' },
+    nop: { carrier: 'Chị Thu Quỹ', tag: 'GNT', hint: 'Nộp tiền mặt vào ngân hàng: Nợ 112, Có 111.' }
+  });
+
+  /* ---------- helpers ---------- */
+
+  function rng(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const pick = (r, arr) => arr[Math.floor(r() * arr.length)];
+  const int = (r, lo, hi) => lo + Math.floor(r() * (hi - lo + 1));
+  const fmt = n => Math.round(n).toLocaleString('vi-VN').replace(/,/g, '.');
+  const pad = (n, w) => String(n).padStart(w, '0');
+
+  const UNITS = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+  function readTriple(n, full) {
+    const h = Math.floor(n / 100), t = Math.floor(n / 10) % 10, u = n % 10;
+    const w = [];
+    if (full || h > 0) { w.push(UNITS[h], 'trăm'); if (t === 0 && u > 0) w.push('linh'); }
+    if (t > 1) {
+      w.push(UNITS[t], 'mươi');
+      if (u === 1) w.push('mốt'); else if (u === 5) w.push('lăm'); else if (u > 0) w.push(UNITS[u]);
+    } else if (t === 1) {
+      w.push('mười');
+      if (u === 5) w.push('lăm'); else if (u > 0) w.push(UNITS[u]);
+    } else if (u > 0) {
+      w.push(UNITS[u]);
+    }
+    return w.join(' ');
+  }
+  /** Vietnamese amount in words, e.g. 520000 → "Năm trăm hai mươi nghìn đồng". */
+  function readVN(n) {
+    if (!Number.isInteger(n) || n < 0) throw new Error('readVN expects a non-negative integer');
+    if (n === 0) return 'Không đồng';
+    const names = ['', 'nghìn', 'triệu', 'tỷ'];
+    const groups = [];
+    for (let x = n; x > 0; x = Math.floor(x / 1000)) groups.push(x % 1000);
+    const words = [];
+    for (let i = groups.length - 1; i >= 0; i--) {
+      if (groups[i] === 0) continue;
+      words.push(readTriple(groups[i], i !== groups.length - 1));
+      if (names[i]) words.push(names[i]);
+    }
+    const s = words.join(' ');
+    return s.charAt(0).toUpperCase() + s.slice(1) + ' đồng';
+  }
+
+  /* ---------- documents ---------- */
+
+  function invoiceTotals(lines, rate) {
+    const sub = lines.reduce((s, l) => s + l.amt, 0);
+    const vat = Math.round(sub * rate / 100);
+    return { sub, rate, vat, tot: sub + vat };
+  }
+
+  function makeInvoice(r, type, ctx) {
+    const item = pick(r, ITEMS);
+    const qty = int(r, 1, 40);
+    const isBuy = type === 'muaNo';
+    const price = isBuy ? item.cost : item.price;
+    const lines = [{ name: item.name, unit: item.unit, qty, price, amt: qty * price }];
+    const cust = isBuy ? null : pick(r, CUSTOMERS);
+    const no = isBuy ? ctx.nextBuyNo++ : ctx.nextSaleNo++;
+    return {
+      kind: 'HD', type,
+      series: isBuy ? SUPPLIER.series : COMPANY.series, no: pad(no, 7),
+      date: ctx.date,
+      seller: isBuy ? { name: SUPPLIER.name, mst: SUPPLIER.mst } : { name: COMPANY.name, mst: COMPANY.mst },
+      buyer: isBuy ? { name: COMPANY.name, mst: COMPANY.mst } : { name: cust.name, mst: cust.mst },
+      lines, ...invoiceTotals(lines, CFG.vatGoods),
+      pay: type === 'banTM' ? 'Tiền mặt' : type === 'banCK' ? 'Chuyển khoản' : 'Chưa thanh toán',
+      code: [r(), r()].map(x => Math.floor(x * 0x1000000).toString(16).padStart(6, '0')).join('').toUpperCase()
+    };
+  }
+
+  function makeDoc(r, type, ctx) {
+    if (type === 'chiTM') {
+      const e = pick(r, EXPENSES);
+      return { kind: 'PC', type, date: ctx.date, who: e.who, why: e.why, amount: e.amt, words: readVN(e.amt), pay: 'Tiền mặt', sigs: SIGS_PC.slice() };
+    }
+    if (type === 'nop') {
+      const amt = int(r, 3, 9) * 1000000;
+      return { kind: 'GNT', type, date: ctx.date, who: 'Quỹ tiền mặt công ty', why: 'Nộp tiền bán hàng vào tài khoản', amount: amt, words: readVN(amt) };
+    }
+    return makeInvoice(r, type, ctx);
+  }
+
+  /** Returns a new document carrying `defect`, or null if it cannot be applied. */
+  function applyDefect(r, doc, defect, ctx) {
+    const d = JSON.parse(JSON.stringify(doc));
+    switch (defect) {
+      case 'sum': {
+        // Line total no longer equals qty × price; the rest of the invoice follows the wrong line total.
+        d.lines[0].amt += pick(r, [100000, 200000, -100000]);
+        Object.assign(d, invoiceTotals(d.lines, d.rate));
+        break;
+      }
+      case 'tot': d.tot += pick(r, [100000, 1000000, -100000]); break;
+      case 'rate': d.rate = 10; d.vat = Math.round(d.sub * 10 / 100); d.tot = d.sub + d.vat; break;
+      case 'buyer': d.buyer = { name: COMPANY.name, mst: '0318 465 789' }; break;
+      case 'dup': {
+        if (!ctx.postedBuyNos.length) return null;
+        d.no = pick(r, ctx.postedBuyNos); break;
+      }
+      case 'sig': d.sigs = d.sigs.filter(s => s !== 'Người nhận'); break;
+      default: return null;
+    }
+    d.defect = defect;
+    return d;
+  }
+
+  /** Expected journal lines for a clean document. */
+  function answerKey(doc) {
+    const L = (side, acc, amt) => ({ side, acc, amt });
+    switch (doc.type) {
+      case 'banCK': return [L('N', '112', doc.tot), L('C', '511', doc.sub), L('C', '3331', doc.vat)];
+      case 'banTM': return [L('N', '111', doc.tot), L('C', '511', doc.sub), L('C', '3331', doc.vat)];
+      case 'muaNo': return [L('N', '156', doc.sub), L('N', '133', doc.vat), L('C', '331', doc.tot)];
+      case 'chiTM': return [L('N', '642', doc.amount), L('C', '111', doc.amount)];
+      case 'nop': return [L('N', '112', doc.amount), L('C', '111', doc.amount)];
+      default: throw new Error('Unknown document type: ' + doc.type);
+    }
+  }
+
+  /** Amounts the player may choose from when building an entry. */
+  function amountChoices(doc) {
+    if (doc.kind !== 'HD') return [doc.amount];
+    return [...new Set([doc.sub, doc.vat, doc.tot])];
+  }
+
+  /** Clickable fields of a document, in display order. */
+  function fieldsOf(doc) {
+    if (doc.kind === 'HD') return ['no', 'date', 'mstb', 'mstm', 'line', 'sub', 'rate', 'vat', 'tot', 'pay', 'code'];
+    if (doc.kind === 'PC') return ['date', 'who', 'why', 'amount', 'words', 'pay', 'sig'];
+    return ['date', 'who', 'why', 'amount', 'words'];
+  }
+
+  /* ---------- rules ---------- */
+
+  function totals(lines) {
+    return lines.reduce((t, l) => {
+      const a = Number(l.amt) || 0;
+      if (l.side === 'N') t.debit += a; else t.credit += a;
+      return t;
+    }, { debit: 0, credit: 0 });
+  }
+
+  function isBalanced(lines) {
+    if (!lines.length || lines.some(l => !l.amt)) return false;
+    const t = totals(lines);
+    return t.debit > 0 && t.debit === t.credit && lines.some(l => l.side === 'N') && lines.some(l => l.side === 'C');
+  }
+
+  function canonical(lines) {
+    const m = new Map();
+    for (const l of lines) {
+      const k = l.side + ':' + l.acc;
+      m.set(k, (m.get(k) || 0) + Number(l.amt));
+    }
+    return [...m.entries()].sort().map(([k, v]) => k + '=' + v).join('|');
+  }
+
+  /** True only if the doc was clean and the entry matches the key exactly. */
+  function isCorrectEntry(doc, lines) {
+    if (doc.defect) return false;
+    return canonical(lines) === canonical(answerKey(doc));
+  }
+
+  /** Result of tapping a field during the check step. */
+  function tapField(doc, field) {
+    if (doc.defect && DEFECTS[doc.defect].field === field) {
+      return { caught: true, pts: CFG.pts.catch, msg: 'Bắt được! ' + DEFECTS[doc.defect].msg };
+    }
+    return { caught: false, pts: CFG.pts.wrongTap, msg: 'Dòng này đúng rồi con. Soi chỗ khác, hoặc bấm Hợp lệ nếu không thấy gì sai.' };
+  }
+
+  function postResult(doc, lines, secondsOpen) {
+    if (!isBalanced(lines)) throw new Error('Cannot post an unbalanced entry');
+    if (isCorrectEntry(doc, lines)) {
+      const fast = secondsOpen <= CFG.fastSec;
+      return { correct: true, fast, pts: CFG.pts.ok + (fast ? CFG.pts.fast : 0) };
+    }
+    return { correct: false, fast: false, pts: 0 };
+  }
+
+  /** Star for a finished item: correct 4, correct+fast or catch 5, wrong 1, walk-out 0. */
+  function starFor(outcome) {
+    return { fast: 5, catch: 5, ok: 4, wrong: 1, left: 0 }[outcome];
+  }
+
+  /** Build the shift plan: arrival times and documents. Deterministic for a seed. */
+  function planShift(seed) {
+    const r = rng(seed);
+    const ctx = { nextSaleNo: int(r, 120, 160), nextBuyNo: int(r, 60000, 69000), postedBuyNos: [], date: '' };
+    const types = ['banCK', 'banTM', 'chiTM', 'muaNo', 'banCK', 'nop', 'muaNo'];
+    const plan = [];
+    let t = 2;
+    for (let i = 0; i < CFG.docsPerShift; i++) {
+      ctx.date = pad(5 + i, 2) + '/01/2026';
+      const type = i === 0 ? 'banCK' : pick(r, types);
+      const clean = makeDoc(r, type, ctx);
+      let doc = clean;
+      const opts = DEFECTS_BY_TYPE[type];
+      if (i > 0 && opts.length && r() < CFG.defectChance) {
+        const bad = applyDefect(r, clean, pick(r, opts), ctx);
+        if (bad) doc = bad;
+      }
+      if (type === 'muaNo' && !doc.defect) ctx.postedBuyNos.push(clean.no);
+      plan.push({ id: i + 1, at: t, type, carrier: TYPES[type].carrier, tag: TYPES[type].tag, doc, clean });
+      t += int(r, 10, 22);
+    }
+    return plan;
+  }
+
+  function summary(log, score) {
+    const stars = log.map(e => starFor(e.outcome));
+    const avg = stars.length ? stars.reduce((a, b) => a + b, 0) / stars.length : 0;
+    return {
+      posted: log.filter(e => e.outcome === 'ok' || e.outcome === 'fast' || e.outcome === 'wrong').length,
+      correct: log.filter(e => e.outcome === 'ok' || e.outcome === 'fast').length,
+      caught: log.filter(e => e.outcome === 'catch').length,
+      left: log.filter(e => e.outcome === 'left').length,
+      hidden: log.filter(e => e.outcome === 'wrong'),
+      stars: Math.round(avg * 10) / 10,
+      score,
+      bonus: Math.max(0, Math.round(score / 10)) * 1000,
+      salary: CFG.salary
+    };
+  }
+
+  const API = {
+    CFG, COMPANY, ACCOUNTS, TYPES, DEFECTS, DEFECTS_BY_TYPE,
+    rng, fmt, readVN, makeDoc, applyDefect, answerKey, amountChoices, fieldsOf,
+    totals, isBalanced, isCorrectEntry, tapField, postResult, starFor, planShift, summary
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+  else root.NC = API;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+/* Nợ Có Ơi prototype: DOM building helpers (no game state here). */
+(function (root) {
+  'use strict';
+  const NC = root.NC;
+
+  /** Create an element. attrs: class, text, title, disabled, data-*, on<event>. */
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v === undefined || v === null || v === false) continue;
+      if (k === 'class') el.className = v;
+      else if (k === 'text') el.textContent = v;
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? '' : v);
+    }
+    for (const kid of kids.flat()) {
+      if (kid === null || kid === undefined || kid === false) continue;
+      el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+    }
+    return el;
+  }
+
+  const money = n => NC.fmt(n);
+
+  function field(f, label, value, opts) {
+    const o = opts || {};
+    const cls = ['pf', o.total && 'total', o.mark].filter(Boolean).join(' ');
+    return h('button', { class: cls, type: 'button', 'data-f': f, onclick: o.onTap ? () => o.onTap(f) : null, tabindex: o.onTap ? null : '-1' },
+      h('span', { text: label }),
+      h('b', null, value, o.small ? h('small', { text: o.small }) : null));
+  }
+
+  function itemsTable(doc) {
+    return h('table', { class: 'items' },
+      h('tr', null, h('th', { text: 'Tên hàng' }), h('th', { text: 'ĐVT' }), h('th', { class: 'r', text: 'SL' }), h('th', { class: 'r', text: 'Đơn giá' }), h('th', { class: 'r', text: 'Thành tiền' })),
+      doc.lines.map(l => h('tr', null, h('td', { text: l.name }), h('td', { text: l.unit }), h('td', { class: 'r', text: l.qty }), h('td', { class: 'r', text: money(l.price) }), h('td', { class: 'r', text: money(l.amt) }))));
+  }
+
+  /** Render a source document. `onTap(field)` makes every line tappable; `marks` maps field → css class. */
+  function renderDoc(doc, onTap, marks) {
+    const m = marks || {};
+    const F = (f, label, value, extra) => field(f, label, value, Object.assign({ onTap, mark: m[f] }, extra));
+    if (doc.kind === 'HD') {
+      const line = h('button', { class: ['pf', m.line].filter(Boolean).join(' '), type: 'button', 'data-f': 'line', onclick: onTap ? () => onTap('line') : null, tabindex: onTap ? null : '-1' }, itemsTable(doc));
+      return h('div', { class: 'paper' + (onTap ? ' checking' : '') },
+        h('h3', { text: 'HOÁ ĐƠN GIÁ TRỊ GIA TĂNG' }), h('div', { class: 'sub', text: doc.type === 'muaNo' ? 'Hoá đơn điện tử có mã' : 'Liên 2: giao người mua' }),
+        F('no', 'Ký hiệu · Số', doc.series + ' · ' + doc.no),
+        F('date', 'Ngày', doc.date),
+        F('mstb', 'Người bán', doc.seller.name, { small: 'MST ' + doc.seller.mst }),
+        F('mstm', 'Người mua', doc.buyer.name, { small: 'MST ' + doc.buyer.mst }),
+        line,
+        F('sub', 'Cộng tiền hàng', money(doc.sub)),
+        F('rate', 'Thuế suất GTGT', doc.rate + '%'),
+        F('vat', 'Tiền thuế GTGT', money(doc.vat)),
+        F('tot', 'Tổng thanh toán', money(doc.tot), { total: true }),
+        F('pay', 'Hình thức thanh toán', doc.pay),
+        F('code', 'Mã của cơ quan thuế', doc.code));
+    }
+    if (doc.kind === 'PC') {
+      const missing = ['Giám đốc', 'Kế toán', 'Thủ quỹ', 'Người nhận'].filter(s => !doc.sigs.includes(s));
+      return h('div', { class: 'paper' + (onTap ? ' checking' : '') },
+        h('h3', { text: 'PHIẾU CHI' }), h('div', { class: 'sub', text: NC.COMPANY.name }),
+        F('date', 'Ngày', doc.date),
+        F('who', 'Người nhận tiền', doc.who),
+        F('why', 'Lý do', doc.why),
+        F('amount', 'Số tiền', money(doc.amount) + ' đ', { total: true }),
+        F('words', 'Bằng chữ', doc.words),
+        F('pay', 'Hình thức', doc.pay),
+        F('sig', 'Chữ ký', doc.sigs.join(' · '), { small: missing.length ? missing.join(', ') + ': (chưa ký)' : null }));
+    }
+    return h('div', { class: 'paper' + (onTap ? ' checking' : '') },
+      h('h3', { text: 'GIẤY NỘP TIỀN' }), h('div', { class: 'sub', text: 'Ngân hàng TMCP Sông Hàn · TK 0071 000 123 456' }),
+      F('date', 'Ngày', doc.date),
+      F('who', 'Bên trả', doc.who),
+      F('why', 'Nội dung', doc.why),
+      F('amount', 'Số tiền', money(doc.amount) + ' đ', { total: true }),
+      F('words', 'Bằng chữ', doc.words));
+  }
+
+  /** Speech bubble; `who` defaults to Cô Ba. */
+  function bubble(text, tone, who) {
+    const speaker = who || 'Cô Ba';
+    const initials = speaker.split(' ').map(w => w[0]).join('').slice(-2);
+    return h('div', { class: 'bubble' + (tone ? ' ' + tone : '') },
+      h('div', { class: 'ava', 'aria-hidden': 'true', text: initials }),
+      h('p', null, h('b', { text: speaker + ': ' }), text));
+  }
+
+  /** Entry builder. e = { lines, selAcc }, on = { pickAcc, add, remove, setAmt } */
+  function renderEntry(doc, e, on) {
+    const choices = NC.amountChoices(doc);
+    const t = NC.totals(e.lines);
+    const strip = doc.kind === 'HD'
+      ? [['Tiền hàng', doc.sub], ['Thuế GTGT ' + doc.rate + '%', doc.vat], ['Tổng thanh toán', doc.tot]]
+      : [['Số tiền', doc.amount]];
+    const sideBox = (side, title, total) => h('section', { class: 'side ' + (side === 'N' ? 'n' : 'c') },
+      h('header', null, h('span', { text: title }), h('span', { text: money(total) })),
+      e.lines.map((l, i) => l.side !== side ? null : h('div', { class: 'eline' },
+        h('div', { class: 'top' }, h('b', { text: l.acc + ' ' + NC.ACCOUNTS[l.acc] }), h('button', { class: 'x', type: 'button', title: 'Bỏ dòng', 'aria-label': 'Bỏ dòng', onclick: () => on.remove(i), text: '×' })),
+        choices.length > 1 ? h('div', { class: 'amts' }, choices.map(a => h('button', { type: 'button', class: 'amt' + (l.amt === a ? ' sel' : ''), onclick: () => on.setAmt(i, a), text: money(a) }))) : h('div', { text: money(l.amt) }))),
+      h('button', { class: 'side-add', type: 'button', disabled: !e.selAcc, onclick: () => on.add(side), text: '+ đặt thẻ vào ' + (side === 'N' ? 'Nợ' : 'Có') }));
+    const balanced = NC.isBalanced(e.lines);
+    return h('div', null,
+      h('div', { class: 'summary-strip' }, strip.map(([k, v]) => h('div', null, k, h('b', { text: money(v) })))),
+      h('div', { class: 'sides' }, sideBox('N', 'NỢ', t.debit), sideBox('C', 'CÓ', t.credit)),
+      h('div', { class: 'status' },
+        h('span', { text: e.selAcc ? 'Đã chọn ' + e.selAcc + ' ' + NC.ACCOUNTS[e.selAcc] + ', chạm Nợ hoặc Có' : 'Chọn thẻ tài khoản bên dưới' }),
+        h('span', { class: 'badge ' + (balanced ? 'ok' : 'no'), text: balanced ? 'Đã cân' : 'Chưa cân' })),
+      h('div', { class: 'cards' }, Object.entries(NC.ACCOUNTS).map(([code, name]) =>
+        h('button', { type: 'button', class: 'chip' + (e.selAcc === code ? ' sel' : ''), onclick: () => on.pickAcc(code) }, name, h('small', { text: code })))));
+  }
+
+  function entryText(lines) {
+    return lines.map(l => (l.side === 'N' ? 'Nợ ' : 'Có ') + l.acc + ' ' + money(l.amt)).join(' / ');
+  }
+
+  function notesBody() {
+    const acc = Object.entries(NC.ACCOUNTS).map(([c, n]) => h('li', null, h('b', { text: c }), ' ' + n + ' · tăng bên ' + (['331', '3331', '511'].includes(c) ? 'Có' : 'Nợ')));
+    const defects = Object.values(NC.DEFECTS).map(d => h('li', { text: d.msg }));
+    return h('div', null,
+      h('h4', { text: 'Công ty mình' }),
+      h('div', { text: NC.COMPANY.name + ' · MST ' + NC.COMPANY.mst }),
+      h('h4', { text: 'Thuế GTGT năm 2026' }),
+      h('div', { text: 'Hàng hoá, dịch vụ thông thường: 8%. Viễn thông, tài chính ngân hàng: 10%.' }),
+      h('h4', { text: 'Thẻ tài khoản' }), h('ul', null, acc),
+      h('h4', { text: 'Lỗi cần soi' }), h('ul', null, defects),
+      h('h4', { text: 'Mẹo' }),
+      h('div', { text: 'Tiền đi vào đâu thì Nợ chỗ đó, tiền từ đâu ra thì Có chỗ đó. Sai mà vẫn cân thì game không báo ngay: cuối ca Cô Ba rà sổ mới lộ.' }));
+  }
+
+  root.NCView = { h, renderDoc, renderEntry, bubble, entryText, notesBody, money };
+})(window);
+</script>
+<script>
+/* Nợ Có Ơi prototype: game state, loop and actions for one shift. */
+(function () {
+  'use strict';
+  const NC = window.NC, V = window.NCView, h = V.h;
+  const CFG = NC.CFG;
+  const TICK_MS = 200;
+  const DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  const BEST_KEY = 'noCoOi-proto-best';
+
+  const screen = document.getElementById('screen');
+  const scoreEl = document.getElementById('score');
+
+  let S = null;          // current game state
+  let timer = null;
+
+  /* ---------- state ---------- */
+
+  function newShift() {
+    const seed = Math.floor(Math.random() * 1e9);
+    return {
+      phase: 'shift', seed, t: 0, paused: false, score: 0,
+      upcoming: NC.planShift(seed).map(p => Object.assign({}, p, { patience: CFG.patBase })),
+      queue: [], desk: null, log: [], msg: { text: 'Bắt đầu tuần mới. Chạm vào người đang chờ ở hàng trên để nhận chứng từ.', tone: '' },
+      hints: true
+    };
+  }
+
+  const shiftOver = () => S.t >= CFG.shiftSec;
+  const remaining = () => S.upcoming.length + S.queue.length + (S.desk ? 1 : 0);
+
+  function say(text, tone, who) { S.msg = { text, tone: tone || '', who }; }
+
+  function addScore(pts) {
+    S.score += pts;
+    if (!pts) return;
+    const f = h('div', { class: 'float ' + (pts > 0 ? 'plus' : 'minus'), text: (pts > 0 ? '+' : '') + pts });
+    document.body.append(f);
+    setTimeout(() => f.remove(), 900);
+  }
+
+  /* ---------- loop ---------- */
+
+  function tick() {
+    if (!S || S.phase !== 'shift' || S.paused) return;
+    S.t += TICK_MS / 1000;
+
+    const arrived = S.upcoming.filter(p => p.at <= S.t);
+    if (arrived.length) {
+      S.upcoming = S.upcoming.filter(p => p.at > S.t);
+      // corrected copies jump to the head of the queue, new arrivals join the back
+      S.queue = [...arrived.filter(p => p.returned), ...S.queue, ...arrived.filter(p => !p.returned)];
+    }
+
+    const waited = S.queue.map(p => Object.assign({}, p, { patience: p.patience - TICK_MS / 1000 }));
+    const gone = waited.filter(p => p.patience <= 0);
+    S.queue = waited.filter(p => p.patience > 0);
+    for (const p of gone) {
+      addScore(CFG.pts.left);
+      S.log.push({ outcome: 'left', item: p });
+      say(p.carrier + ' chờ lâu quá nên bỏ về. Chứng từ đó coi như chưa ghi sổ. −50', 'bad');
+    }
+
+    if (shiftOver() || (remaining() === 0 && S.t > 5)) return endShift();
+    if (gone.length) return renderAll();
+    renderLive();
+  }
+
+  /* ---------- actions ---------- */
+
+  function take(id) {
+    if (S.desk) return say('Làm xong chứng từ trên bàn đã con.', 'bad'), renderAll();
+    const p = S.queue.find(q => q.id === id);
+    if (!p) return;
+    S.queue = S.queue.filter(q => q !== p);
+    S.desk = { item: p, step: 'check', openedAt: S.t, lines: [], selAcc: null, marks: {} };
+    say(p.returned ? 'Sửa lại rồi nè, em ghi giùm nha.' : NC.TYPES[p.type].hint.split(':')[0] + ' nè, em ghi sổ giùm.', '', p.carrier);
+    renderAll();
+  }
+
+  function deferDesk() {
+    const p = S.desk.item;
+    S.queue = [...S.queue, p];
+    S.desk = null;
+    say('Để sau cũng được, nhưng người ta vẫn đứng chờ đó nha.');
+    renderAll();
+  }
+
+  function tap(f) {
+    const d = S.desk;
+    const res = NC.tapField(d.item.doc, f);
+    addScore(res.pts);
+    if (!res.caught) {
+      d.marks = Object.assign({}, d.marks, { [f]: 'miss' });
+      say(res.msg, 'bad');
+      return renderAll();
+    }
+    S.log.push({ outcome: 'catch', item: d.item });
+    // the carrier fixes the document and comes back with a clean copy
+    S.upcoming = [...S.upcoming, Object.assign({}, d.item, { doc: d.item.clean, returned: true, at: S.t + CFG.returnSec, patience: CFG.patBase })];
+    S.desk = null;
+    say(res.msg + ' Trả lại cho người ta sửa. +' + res.pts, 'good');
+    renderAll();
+  }
+
+  function markValid() {
+    S.desk.step = 'entry';
+    const d = S.desk.item.doc;
+    say(S.hints ? NC.TYPES[S.desk.item.type].hint : 'Định khoản đi con. Hai bên phải bằng nhau mới ghi sổ được.');
+    if (d.kind !== 'HD') S.desk.single = d.amount;
+    renderAll();
+  }
+
+  const entryHandlers = {
+    pickAcc(code) { S.desk.selAcc = S.desk.selAcc === code ? null : code; renderAll(); },
+    add(side) {
+      const d = S.desk;
+      if (!d.selAcc) return;
+      const amt = d.single !== undefined ? d.single : null;
+      d.lines = [...d.lines, { side, acc: d.selAcc, amt }];
+      d.selAcc = null;
+      renderAll();
+    },
+    remove(i) { S.desk.lines = S.desk.lines.filter((_, k) => k !== i); renderAll(); },
+    setAmt(i, a) { S.desk.lines = S.desk.lines.map((l, k) => (k === i ? Object.assign({}, l, { amt: a }) : l)); renderAll(); }
+  };
+
+  function resetEntry() { S.desk.lines = []; S.desk.selAcc = null; renderAll(); }
+
+  function post() {
+    const d = S.desk;
+    if (!NC.isBalanced(d.lines)) return;
+    const res = NC.postResult(d.item.doc, d.lines, S.t - d.openedAt);
+    addScore(res.pts);
+    S.log.push({ outcome: res.correct ? (res.fast ? 'fast' : 'ok') : 'wrong', item: d.item, lines: d.lines });
+    S.desk = null;
+    if (res.correct) say(res.fast ? 'Giỏi! Nhanh mà chuẩn. +' + res.pts : 'Chuẩn! Cất vô tủ hồ sơ đi con. +' + res.pts, 'good');
+    else say('Đã ghi sổ. Người tiếp theo nào.');
+    renderAll();
+  }
+
+  function togglePause() { S.paused = !S.paused; renderAll(); }
+
+  function endShift() {
+    S.phase = 'summary';
+    let best = 0;
+    try { best = Number(localStorage.getItem(BEST_KEY)) || 0; if (S.score > best) localStorage.setItem(BEST_KEY, String(S.score)); } catch (e) { best = 0; }
+    S.best = Math.max(best, S.score);
+    renderAll();
+  }
+
+  function start() {
+    S = newShift();
+    clearInterval(timer);
+    timer = setInterval(tick, TICK_MS);
+    renderAll();
+  }
+
+  /* ---------- rendering ---------- */
+
+  function clockText() {
+    const dayLen = CFG.shiftSec / DAYS.length;
+    const day = Math.min(DAYS.length - 1, Math.floor(S.t / dayLen));
+    const mins = Math.floor(((S.t % dayLen) / dayLen) * 9 * 60);
+    return DAYS[day] + ' ' + (8 + Math.floor(mins / 60)) + ':' + String(mins % 60).padStart(2, '0');
+  }
+
+  function clockEl() {
+    return h('div', { class: 'clock' },
+      h('button', { class: 'ghost', type: 'button', onclick: togglePause, 'aria-label': S.paused ? 'Tiếp tục' : 'Tạm dừng', text: S.paused ? '▶' : '❚❚' }),
+      h('b', { text: clockText() }),
+      h('div', { class: 'track' }, h('i', { style: 'transform:scaleX(' + Math.min(1, S.t / CFG.shiftSec).toFixed(3) + ')' })));
+  }
+
+  function queueEl() {
+    if (!S.queue.length) return h('div', { class: 'queue' }, h('span', { class: 'queue-empty', text: S.upcoming.length ? 'Chưa ai tới…' : 'Hết người chờ.' }));
+    return h('div', { class: 'queue' }, S.queue.map(p => {
+      const ratio = Math.max(0, p.patience / CFG.patBase);
+      return h('button', { type: 'button', class: 'carrier', 'data-id': p.id, onclick: () => take(p.id), title: 'Nhận chứng từ của ' + p.carrier },
+        h('span', { class: 'tag', text: p.tag }),
+        h('span', { class: 'face', text: p.carrier.split(' ').map(w => w[0]).join('').slice(-2) }),
+        h('span', { text: p.carrier }),
+        h('div', { class: 'pat' + (ratio < 0.3 ? ' low' : '') }, h('i', { style: 'width:' + (ratio * 100).toFixed(0) + '%' })));
+    }));
+  }
+
+  function deskEl() {
+    const d = S.desk;
+    if (!d) return h('div', { class: 'paper', style: 'text-align:center;color:var(--muted);padding:28px' }, 'Bàn trống. Chạm vào một người ở hàng trên để nhận chứng từ.');
+    const steps = h('div', { class: 'steps' }, ['1 · Kiểm tra', '2 · Định khoản', '3 · Ghi sổ'].map((s, i) => h('span', { class: (i === 0 && d.step === 'check') || (i === 1 && d.step === 'entry') ? 'now' : '', text: s })));
+    if (d.step === 'check') return h('div', null, steps, V.renderDoc(d.item.doc, tap, d.marks));
+    return h('div', null, steps, V.renderEntry(d.item.doc, d, entryHandlers));
+  }
+
+  function actionsEl() {
+    const d = S.desk;
+    if (!d) return h('div', { class: 'actions' }, h('button', { class: 'ghost', style: 'flex:1', type: 'button', onclick: togglePause, text: S.paused ? 'Tiếp tục' : 'Tạm dừng' }));
+    if (d.step === 'check') return h('div', { class: 'actions' },
+      h('button', { class: 'ghost', type: 'button', onclick: deferDesk, text: 'Để sau' }),
+      h('button', { class: 'primary go', type: 'button', onclick: markValid, text: 'Hợp lệ ✓' }));
+    return h('div', { class: 'actions' },
+      h('button', { class: 'ghost', type: 'button', onclick: resetEntry, text: 'Làm lại' }),
+      h('button', { class: 'primary go', type: 'button', onclick: post, disabled: !NC.isBalanced(d.lines), text: 'Ghi sổ' }));
+  }
+
+  let liveClock = null, liveQueue = null, liveQueueKey = '';
+  const queueKey = () => S.queue.map(p => p.id).join(',') + '|' + (S.upcoming.length ? 1 : 0);
+
+  // Rebuild the queue only when someone arrives or leaves; otherwise just move the
+  // patience bars, so a tap that spans a tick still lands on the same button.
+  function patchQueue() {
+    for (const p of S.queue) {
+      const btn = liveQueue.querySelector('[data-id="' + p.id + '"]');
+      if (!btn) continue;
+      const ratio = Math.max(0, p.patience / CFG.patBase);
+      btn.querySelector('.pat').className = 'pat' + (ratio < 0.3 ? ' low' : '');
+      btn.querySelector('.pat i').style.width = (ratio * 100).toFixed(0) + '%';
+    }
+  }
+
+  function renderLive() {
+    scoreEl.textContent = S.score + ' đ';
+    if (liveClock) {
+      // same reason as patchQueue: keep the pause button, update only the time and track
+      liveClock.querySelector('b').textContent = clockText();
+      liveClock.querySelector('.track i').style.transform = 'scaleX(' + Math.min(1, S.t / CFG.shiftSec).toFixed(3) + ')';
+    }
+    if (!liveQueue) return;
+    const key = queueKey();
+    if (key !== liveQueueKey) { const q = queueEl(); liveQueue.replaceWith(q); liveQueue = q; liveQueueKey = key; }
+    else patchQueue();
+  }
+
+  function renderIntro() {
+    screen.replaceChildren(h('div', { class: 'intro' },
+      h('div', { class: 'mascot', 'aria-hidden': 'true', text: '🧮' }),
+      h('h1', { text: 'Nợ Có Ơi' }),
+      h('p', { text: 'Bạn là Út Sổ, kế toán mới của Công ty Vật Tư Phát Tài. Một ca là một tuần làm việc: nhận chứng từ, soi lỗi, định khoản, ghi sổ.' }),
+      h('ol', { class: 'rules' },
+        h('li', { text: 'Chạm người trong hàng chờ để nhận chứng từ. Chờ lâu quá họ bỏ về (−50).' }),
+        h('li', { text: 'Thấy dòng sai thì chạm vào dòng đó (+40). Chạm nhầm dòng đúng −10.' }),
+        h('li', { text: 'Không sai thì bấm Hợp lệ, đặt thẻ tài khoản vào Nợ/Có, chọn số tiền, Ghi sổ (+100, nhanh dưới 20 giây +20).' }),
+        h('li', { text: 'Sai mà vẫn cân thì không bị báo ngay: cuối ca Cô Ba rà sổ mới lộ.' })),
+      h('button', { class: 'primary', type: 'button', onclick: start, text: 'Vào ca tuần 1 →' })));
+    scoreEl.textContent = '0 đ';
+  }
+
+  function renderSummary() {
+    const s = NC.summary(S.log, S.score);
+    const full = Math.round(s.stars);
+    const unprocessed = remaining();
+    screen.replaceChildren(h('div', { class: 'report' },
+      h('h2', { text: 'Hết tuần 1 · tổng kết ca' }),
+      h('div', { class: 'stars', 'aria-label': s.stars + ' sao', text: '★'.repeat(full) + '☆'.repeat(5 - full) }),
+      h('div', { style: 'color:var(--muted)', text: s.stars + ' sao trung bình · điểm ca ' + s.score + ' · kỷ lục ' + S.best }),
+      h('div', { class: 'stats' },
+        h('div', null, h('b', { text: s.correct + '/' + s.posted }), h('small', { text: 'ghi đúng / đã ghi' })),
+        h('div', null, h('b', { text: s.caught }), h('small', { text: 'bắt được lỗi' })),
+        h('div', null, h('b', { text: s.left }), h('small', { text: 'người bỏ về' }))),
+      h('div', { class: 'reveal' },
+        h('h3', { text: s.hidden.length ? 'Cô Ba rà sổ: lộ ' + s.hidden.length + ' sai sót ẩn' : s.posted ? 'Cô Ba rà sổ: sổ sạch!' : 'Cô Ba rà sổ: tuần này chưa ghi chứng từ nào' }),
+        !s.posted ? null : s.hidden.length ? s.hidden.map(e => h('div', { class: 'err' },
+          h('div', null, h('b', { text: e.item.carrier + ' · ' + (e.item.doc.kind === 'HD' ? 'HĐ ' + e.item.doc.no : e.item.doc.kind === 'PC' ? 'Phiếu chi ' + e.item.doc.date : 'Giấy nộp tiền ' + e.item.doc.date) })),
+          e.item.doc.defect ? h('div', { text: 'Chứng từ có lỗi mà vẫn ghi: ' + NC.DEFECTS[e.item.doc.defect].msg }) : null,
+          h('div', null, 'Con ghi: ', h('code', { text: V.entryText(e.lines) })),
+          h('div', null, 'Đúng ra: ', h('code', { text: V.entryText(NC.answerKey(e.item.clean)) })))) : h('div', { text: 'Mọi bút toán đều khớp chứng từ.' }),
+        unprocessed ? h('div', { class: 'err', text: unprocessed + ' chứng từ chưa kịp xử lý khi hết ca.' }) : null),
+      h('div', { class: 'wallet' },
+        h('div', null, h('span', { text: 'Lương tuần' }), h('b', { text: '+' + V.money(s.salary) })),
+        h('div', null, h('span', { text: 'Thưởng theo điểm (điểm × 100 đ)' }), h('b', { text: '+' + V.money(s.bonus) })),
+        h('div', { class: 'sum' }, h('span', { text: 'Nhận được' }), h('b', { text: V.money(s.salary + s.bonus) + ' đ' }))),
+      h('button', { class: 'primary', type: 'button', onclick: start, text: 'Chơi ca mới' })));
+    scoreEl.textContent = S.score + ' đ';
+  }
+
+  function renderAll() {
+    if (!S) return renderIntro();
+    if (S.phase === 'summary') { liveClock = liveQueue = null; return renderSummary(); }
+    liveClock = clockEl();
+    liveQueue = queueEl();
+    liveQueueKey = queueKey();
+    const hintToggle = h('label', { style: 'font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center;margin-top:8px' },
+      h('input', { type: 'checkbox', checked: S.hints, onchange: e => { S.hints = e.target.checked; } }), 'Cô Ba gợi ý định khoản');
+    const veil = S.paused ? h('div', { class: 'paused-veil' }, h('div', null, h('p', { text: 'Đang tạm dừng' }), h('button', { class: 'primary', type: 'button', onclick: togglePause, text: 'Tiếp tục' }))) : null;
+    screen.replaceChildren(...[liveClock, liveQueue, deskEl(), V.bubble(S.msg.text, S.msg.tone, S.msg.who), hintToggle, actionsEl(), veil].filter(Boolean));
+    scoreEl.textContent = S.score + ' đ';
+  }
+
+  document.getElementById('btn-notes').addEventListener('click', () => {
+    document.getElementById('notes-body').replaceChildren(V.notesBody());
+    document.getElementById('notes').showModal();
+  });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
